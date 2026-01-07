@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
+.env
 
 config/client_secret_381785123064-6scb8qudq9u8vm2imnac5sli2nod6u6h.apps.googleusercontent.com.json
 
