@@ -10,6 +10,7 @@ const instructorsRoutes = require("./routes/instructorsRoutes");
 const liveclassesRoutes = require("./routes/liveClassesRoutes");
 const enrollmentRoutes = require("./routes/enrollmentRoutes");
 const googleAuthRoutes = require("./routes/googleAuthRoutes");
+const contactUsRoutes = require("./routes/contactUsRoutes");
 
 const session = require("express-session");
 const app = express();
@@ -47,7 +48,11 @@ app.use("/api/liveclasses", liveclassesRoutes);
 
 app.use("/api/google", googleAuthRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
+
+app.use("/api/contactus", contactUsRoutes);
+
 // Start server
+
 async function startServer() {
   try {
     await connectDB();
