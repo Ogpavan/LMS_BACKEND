@@ -18,10 +18,20 @@ const PORT = process.env.PORT || 5000;
 const path = require("path");
 
 // Middleware
+const allowedOrigins = ["http://localhost:5173", "https://skillspardha.com"];
+
 app.use(
   cors({
-    origin: "http://localhost:5173", // your frontend URL
-    credentials: true, // allow cookies/session
+    origin: function (origin, callback) {
+      // allow requests with no origin like mobile apps or Postman
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("CORS policy: This origin is not allowed"));
+      }
+    },
+    credentials: true,
   })
 );
 app.use(express.json());
