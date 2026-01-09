@@ -11,7 +11,7 @@ const liveclassesRoutes = require("./routes/liveClassesRoutes");
 const enrollmentRoutes = require("./routes/enrollmentRoutes");
 const googleAuthRoutes = require("./routes/googleAuthRoutes");
 const contactUsRoutes = require("./routes/contactUsRoutes");
-
+const displayCourseRoutes = require("./routes/displayCourseRoutes");
 const session = require("express-session");
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,7 +50,7 @@ app.use("/api/google", googleAuthRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
 
 app.use("/api/contactus", contactUsRoutes);
-
+app.use("/api/display-courses", displayCourseRoutes);
 // Start server
 
 async function startServer() {
