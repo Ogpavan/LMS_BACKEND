@@ -20,7 +20,11 @@ const PORT = process.env.PORT || 5000;
 const path = require("path");
 
 // Middleware
-const allowedOrigins = ["http://localhost:5173", "https://skillspardha.com"];
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://skillspardha.com",
+  "https://app.skillspardha.com",
+];
 
 app.use(
   cors({
