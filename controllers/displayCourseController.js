@@ -52,3 +52,41 @@ exports.getCoursesByCategory = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+// ...existing code...
+
+exports.getDisplayCourseDetails = async (req, res) => {
+  try {
+    const pool = await db.connectDB();
+    const courseId = req.params.id;
+
+    const query = `
+      SELECT *
+      FROM display_course_details
+      WHERE course_id = $1
+    `;
+    const { rows } = await pool.query(query, [courseId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    res.status(200).json(rows[0]);
+  } catch (err) {
+    console.error("Error fetching course details:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+// ...existing code...
+
+exports.getCoursesNamesAndIds = async (req, res) => {
+  try {
+    const pool = await db.connectDB();
+    const query = `select id,title from display_courses where is_active=true`;
+    const { rows } = await pool.query(query);
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error("Error fetching course names and IDs:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
