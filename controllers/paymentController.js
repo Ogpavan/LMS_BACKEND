@@ -3,15 +3,6 @@ const db = require("../config/db");
 
 require("dotenv").config();
 
-console.log(
-  "Loaded Razorpay KEY_ID:",
-  JSON.stringify(process.env.RAZORPAY_KEY_ID)
-);
-console.log(
-  "Loaded Razorpay KEY_SECRET:",
-  JSON.stringify(process.env.RAZORPAY_KEY_SECRET)
-);
-
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
@@ -20,7 +11,6 @@ const razorpay = new Razorpay({
 exports.createOrder = async (req, res) => {
   try {
     const { enrollmentId } = req.body;
-    console.log("Received enrollmentId:", enrollmentId);
 
     if (!enrollmentId) {
       console.error("enrollmentId missing in request body");
@@ -34,7 +24,6 @@ exports.createOrder = async (req, res) => {
       "SELECT course_id FROM student_enrollments WHERE id = $1",
       [enrollmentId]
     );
-    console.log("Enrollment query result:", enrollRes.rows);
 
     if (enrollRes.rows.length === 0) {
       console.error("Enrollment not found for id:", enrollmentId);
@@ -47,7 +36,6 @@ exports.createOrder = async (req, res) => {
       "SELECT price FROM display_courses WHERE id = $1",
       [courseId]
     );
-    console.log("Course query result:", courseRes.rows);
 
     if (courseRes.rows.length === 0) {
       console.error("Course not found for id:", courseId);
@@ -61,12 +49,8 @@ exports.createOrder = async (req, res) => {
       receipt: `receipt_${enrollmentId}`,
     };
 
-    console.log("Creating Razorpay order with options:", options);
-    console.log("Razorpay instance:", razorpay);
-
     try {
       const order = await razorpay.orders.create(options);
-      console.log("Razorpay order created:", order);
 
       // Optionally, store order_id in DB for later verification
       await pool.query(
