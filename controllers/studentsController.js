@@ -6,7 +6,7 @@ exports.getStudents = async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT * FROM sp_get_users_by_role($1)",
-      [3] // Student role_id = 3
+      [3], // Student role_id = 3
     );
 
     const students = result.rows.map((s) => ({
@@ -37,7 +37,7 @@ exports.updateUser = async (req, res) => {
 
     await pool.query(
       `CALL sp_update_user($1, $2, $3, $4, $5, $6, NULL, NULL)`,
-      [user_id, email, phone, full_name, role_id, is_active]
+      [user_id, email, phone, full_name, role_id, is_active],
     );
 
     res.json({ success: true, message: "User updated successfully" });
@@ -61,7 +61,7 @@ exports.updateUserStatus = async (req, res) => {
 
     await pool.query(
       `CALL sp_update_user($1, NULL, NULL, NULL, NULL, $2, NULL, NULL)`,
-      [user_id, is_active]
+      [user_id, is_active],
     );
 
     res.json({ success: true, message: "User status updated successfully" });
@@ -111,8 +111,16 @@ exports.createUser = async (req, res) => {
     const password_hash = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
-      "SELECT * FROM sp_create_user($1, $2, $3, $4, $5, NULL)",
-      [email, phone, password_hash, full_name, 3] // role_id = 3 for students
+      `
+      SELECT * FROM sp_create_user(
+        p_email => $1,
+        p_password_hash => $2,
+        p_full_name => $3,
+        p_role_id => $4,
+        p_phone => $5
+      )
+      `,
+      [email, password_hash, full_name, 3, phone],
     );
 
     const userRecord = result.rows[0];
@@ -120,18 +128,20 @@ exports.createUser = async (req, res) => {
     if (!userRecord || !userRecord.user_id) {
       return res
         .status(400)
-        .json({ error: userRecord.message || "Failed to create user" });
+        .json({ error: userRecord?.message || "Failed to create user" });
     }
 
-    const user = {
-      user_id: userRecord.user_id,
-      full_name,
-      email,
-      phone,
-      is_active: true,
-    };
-
-    res.json({ success: true, user, message: userRecord.message });
+    res.json({
+      success: true,
+      user: {
+        user_id: userRecord.user_id,
+        full_name,
+        email,
+        phone,
+        is_active: true,
+      },
+      message: userRecord.message,
+    });
   } catch (err) {
     console.error("Error creating user:", err);
     res.status(500).json({ error: err.message || "Failed to create user" });
