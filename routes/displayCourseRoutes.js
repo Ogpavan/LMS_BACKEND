@@ -2,8 +2,11 @@ const express = require("express");
 const router = express.Router();
 const displayCourseController = require("../controllers/displayCourseController");
 
+router.get("/by-category", displayCourseController.getCoursesByCategory);
 // POST /api/display-courses
 router.post("/", displayCourseController.createDisplayCourse);
+
+router.get("/names-ids", displayCourseController.getCoursesNamesAndIds);
 
 // GET /api/display-courses (flat list)
 router.get("/", displayCourseController.getAllDisplayCourses);

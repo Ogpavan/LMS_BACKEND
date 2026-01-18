@@ -2,6 +2,7 @@
  * PUT /display-courses/:id
  * Update a display course
  */
+
 exports.updateDisplayCourse = async (req, res) => {
   try {
     const pool = await db.connectDB();
@@ -225,6 +226,7 @@ exports.getCoursesByCategory = async (req, res) => {
 };
 
 exports.getDisplayCourseDetails = async (req, res) => {
+  console.log("getCoursesByCategory called");
   try {
     const pool = await db.connectDB();
     const courseId = req.params.id;
