@@ -43,7 +43,7 @@ exports.uploadCourse = async (req, res) => {
     // -------------------------------------------------
     const finalChapters = chapters.map((chapter, idx) => {
       const video = req.files?.find(
-        (f) => f.fieldname === `chapter_video_${idx}`
+        (f) => f.fieldname === `chapter_video_${idx}`,
       );
 
       return {
@@ -98,25 +98,56 @@ exports.uploadCourse = async (req, res) => {
 
 exports.getAllCourses = async (req, res) => {
   try {
-    const pool = await db.connectDB(); // pg Pool
-    const query = `SELECT sp_get_course(NULL) AS result`; // NULL means "get all courses"
+    // Try to get user_id from req.user_id or from query param
+    const userId = req.user_id || req.query.user_id;
 
-    const result = await pool.query(query);
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized",
+      });
+    }
+
+    const pool = await db.connectDB();
+
+    // console.log("Fetching courses for user ID:", userId);
+
+    const query = `
+  SELECT
+  uc.id AS enrollment_id,
+  mc.id AS course_id,
+  mc.course_code,
+  mc.title,
+  mc.description,
+  mc.level,
+  mc.duration,
+  mc.price,
+  mc.image_url,
+  uc.created_at AS enrolled_at
+FROM user_courses uc
+JOIN master_courses mc ON mc.id = uc.course_id
+WHERE uc.user_id = $1
+  AND uc.payment_status = 'paid'
+  AND uc.is_active = TRUE
+  AND mc.is_deleted = FALSE
+ORDER BY uc.created_at DESC;
+    `;
+
+    const { rows } = await pool.query(query, [userId]);
+    // console.log("Courses fetched:", rows.length);
 
     res.json({
       success: true,
-      courses: result.rows[0].result || [], // JSON array of courses
+      courses: rows,
     });
   } catch (err) {
-    console.error("Get Courses Error:", err);
+    console.error("Get Enrolled Courses Error:", err);
     res.status(500).json({
       success: false,
       error: err.message,
     });
   }
 };
-
-// ...existing code...
 
 exports.getCourseById = async (req, res) => {
   try {
@@ -150,5 +181,3 @@ exports.getCourseById = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
-
-// ...existing code...

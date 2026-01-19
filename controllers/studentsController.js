@@ -26,18 +26,36 @@ exports.getStudents = async (req, res) => {
 };
 
 // Update user details
+// ...existing code...
 exports.updateUser = async (req, res) => {
   try {
     const { user_id } = req.params;
-    const { email, phone, full_name, role_id, is_active } = req.body;
+    let { email, phone, full_name, role_id, is_active, password } = req.body;
 
     if (!user_id) {
       return res.status(400).json({ error: "user_id is required" });
     }
 
+    // If role_id is not provided, set default to 3 (student)
+    if (!role_id) {
+      role_id = 3;
+    }
+
+    let password_hash = null;
+    if (password) {
+      password_hash = await bcrypt.hash(password, 10);
+    }
+
     await pool.query(
-      `CALL sp_update_user($1, $2, $3, $4, $5, $6, NULL, NULL)`,
-      [user_id, email, phone, full_name, role_id, is_active],
+      `UPDATE users
+       SET email = $1,
+           phone = $2,
+           full_name = $3,
+           role_id = $4,
+           is_active = $5,
+           password_hash = COALESCE($6, password_hash)
+       WHERE user_id = $7`,
+      [email, phone, full_name, role_id, is_active, password_hash, user_id],
     );
 
     res.json({ success: true, message: "User updated successfully" });
@@ -46,6 +64,7 @@ exports.updateUser = async (req, res) => {
     res.status(500).json({ error: "Failed to update user" });
   }
 };
+// ...existing code...
 
 // Update only user status (is_active)
 exports.updateUserStatus = async (req, res) => {

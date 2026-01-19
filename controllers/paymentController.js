@@ -1,6 +1,5 @@
 const Razorpay = require("razorpay");
 const db = require("../config/db");
-
 require("dotenv").config();
 
 const razorpay = new Razorpay({
@@ -11,67 +10,58 @@ const razorpay = new Razorpay({
 exports.createOrder = async (req, res) => {
   try {
     const { enrollmentId } = req.body;
-
-    if (!enrollmentId) {
-      console.error("enrollmentId missing in request body");
+    if (!enrollmentId)
       return res.status(400).json({ error: "enrollmentId required" });
-    }
 
     const pool = await db.connectDB();
 
-    // Get course_id from enrollment
-    const enrollRes = await pool.query(
-      "SELECT course_id FROM student_enrollments WHERE id = $1",
-      [enrollmentId]
+    // 1️⃣ Get enrollment info
+    const enrollmentRes = await pool.query(
+      "SELECT course_id FROM user_courses WHERE id = $1",
+      [enrollmentId],
     );
 
-    if (enrollRes.rows.length === 0) {
-      console.error("Enrollment not found for id:", enrollmentId);
+    if (enrollmentRes.rows.length === 0) {
       return res.status(404).json({ error: "Enrollment not found" });
     }
-    const courseId = enrollRes.rows[0].course_id;
 
-    // Get price from course table
+    const courseId = enrollmentRes.rows[0].course_id;
+
+    // 2️⃣ Get course price
     const courseRes = await pool.query(
-      "SELECT price FROM display_courses WHERE id = $1",
-      [courseId]
+      "SELECT price FROM master_courses WHERE id = $1",
+      [courseId],
     );
 
     if (courseRes.rows.length === 0) {
-      console.error("Course not found for id:", courseId);
       return res.status(404).json({ error: "Course not found" });
     }
+
     const amount = courseRes.rows[0].price;
 
     const options = {
-      amount: amount * 100, // amount in paise
+      amount: amount * 100, // in paise
       currency: "INR",
       receipt: `receipt_${enrollmentId}`,
     };
 
-    try {
-      const order = await razorpay.orders.create(options);
+    // 3️⃣ Create Razorpay order
+    const order = await razorpay.orders.create(options);
 
-      // Optionally, store order_id in DB for later verification
-      await pool.query(
-        "UPDATE student_enrollments SET razorpay_order_id = $1 WHERE id = $2",
-        [order.id, enrollmentId]
-      );
+    // 4️⃣ Store Razorpay order id in user_courses
+    await pool.query(
+      "UPDATE user_courses SET razorpay_order_id = $1, updated_at = NOW() WHERE id = $2",
+      [order.id, enrollmentId],
+    );
 
-      res.json({
-        orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        key: process.env.RAZORPAY_KEY_ID,
-      });
-    } catch (rzpErr) {
-      console.error("Error from Razorpay API:", rzpErr);
-      return res
-        .status(500)
-        .json({ error: "Razorpay API error", details: rzpErr });
-    }
+    res.json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key: process.env.RAZORPAY_KEY_ID,
+    });
   } catch (err) {
     console.error("Error creating Razorpay order:", err);
-    res.status(500).json({ error: "Server error", details: err });
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 };
