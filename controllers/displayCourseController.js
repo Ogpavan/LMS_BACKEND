@@ -171,7 +171,7 @@ exports.getAllDisplayCourses = async (req, res) => {
     const query = `
       SELECT id, category_id, course_code, title, description, duration, level, price,
              image_url, is_active, is_published, created_at, updated_at
-      FROM display_courses
+      FROM master_courses
       ORDER BY created_at DESC
     `;
     const { rows } = await pool.query(query);
@@ -265,7 +265,7 @@ exports.saveDisplayCourseJson = async (req, res) => {
     }
 
     const upsertQuery = `
-      INSERT INTO master_course_details (course_id, course_json)
+      INSERT INTO display_course_details (course_id, course_json)
       VALUES ($1, $2)
       ON CONFLICT (course_id)
       DO UPDATE SET course_json = EXCLUDED.course_json
