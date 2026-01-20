@@ -22,11 +22,14 @@ const contactUsRoutes = require("./routes/contactUsRoutes");
 const displayCourseRoutes = require("./routes/displayCourseRoutes");
 const courseBuyRoutes = require("./routes/courseBuyRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
-
 const courseCategoryRoutes = require("./routes/courseCategoryRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+/* ======================================================
+   MULTER (ONLY CHANGE IS HERE)
+====================================================== */
 
 // Multer storage for image uploads
 const imageStorage = multer.diskStorage({
@@ -41,11 +44,24 @@ const imageStorage = multer.diskStorage({
     cb(null, name);
   },
 });
-const upload = multer({ storage: imageStorage });
+
+// ✅ ONLY enhancement: limits + fileFilter
+const upload = multer({
+  storage: imageStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10 MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(new Error("Only JPG, PNG, WEBP images allowed"), false);
+    }
+    cb(null, true);
+  },
+});
 
 /* ======================================================
    CORS CONFIGURATION
-   Allowlist for localhost + production domains
 ====================================================== */
 const allowedOrigins = [
   "http://localhost:5173",
@@ -59,7 +75,6 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow server-to-server or curl requests with no origin
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
@@ -67,7 +82,7 @@ app.use(
         return callback(new Error("CORS not allowed for this origin"));
       }
     },
-    credentials: true, // Required for cookies/sessions
+    credentials: true,
     methods: [
       "GET",
       "POST",
@@ -82,13 +97,14 @@ app.use(
   }),
 );
 
-// Handle preflight requests for all routes
+// Handle preflight requests
 app.options("*", cors());
 
 /* ======================================================
    EXPRESS MIDDLEWARE
 ====================================================== */
 app.use(express.json());
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "your_secret_key",
@@ -96,21 +112,23 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // true on HTTPS
+      secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     },
   }),
 );
 
-// Static uploads folder (including images)
+// Static uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Image upload endpoint
+/* ======================================================
+   IMAGE UPLOAD ENDPOINT
+====================================================== */
 app.post("/api/upload", upload.single("image"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded" });
   }
-  // Return the public URL for the uploaded image
+
   const url = `/uploads/images/${req.file.filename}`;
   res.json({ url });
 });
@@ -131,6 +149,7 @@ app.use("/api/display-courses", displayCourseRoutes);
 app.use("/api/course-buy", courseBuyRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/category", courseCategoryRoutes);
+
 /* ======================================================
    START SERVER
 ====================================================== */
