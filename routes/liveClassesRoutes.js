@@ -13,9 +13,11 @@ router.get("/", liveClassesController.getInstructorLiveClasses);
 router.post("/", liveClassesController.createLiveClass);
 
 // GET /api/liveclasses/courses-with-chapters
+router.get("/courses-with-chapters", liveClassesController.getCoursesDropdown);
+
 router.get(
-  "/courses-with-chapters",
-  liveClassesController.getCoursesWithChapters
+  "/students/:userId/live-classes",
+  liveClassesController.getStudentLiveClasses,
 );
 
 module.exports = router;

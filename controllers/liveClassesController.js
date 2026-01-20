@@ -22,7 +22,7 @@ exports.suspendLiveClass = async (req, res) => {
            updated_at = NOW()
        WHERE id = $1
        RETURNING *;`,
-      [classId]
+      [classId],
     );
 
     if (!result.rows.length) {
@@ -81,7 +81,7 @@ exports.getInstructorLiveClasses = async (req, res) => {
       WHERE lc.teacher_id = $1
         AND (lc.status IS NULL OR lc.status <> 'cancelled')
       ORDER BY lc.start_time DESC;`,
-      [teacher_id]
+      [teacher_id],
     );
 
     res.json({ liveClasses: result.rows });
@@ -120,7 +120,7 @@ exports.getAllLiveClasses = async (req, res) => {
       LEFT JOIN course_chapters ch ON lc.chapter_id = ch.chapter_id
       LEFT JOIN users u ON lc.teacher_id = u.user_id
       WHERE lc.status IS NULL OR lc.status <> 'cancelled'
-      ORDER BY lc.start_time DESC;`
+      ORDER BY lc.start_time DESC;`,
     );
 
     res.json({ liveClasses: result.rows });
@@ -135,50 +135,24 @@ exports.getAllLiveClasses = async (req, res) => {
 /* ======================================================
    Get courses with chapters (dropdown)
 ====================================================== */
-exports.getCoursesWithChapters = async (req, res) => {
+exports.getCoursesDropdown = async (req, res) => {
   try {
     const pool = await connectDB();
 
     const result = await pool.query(
-      `SELECT
-        c.course_id,
-        c.title AS course_title,
-        ch.chapter_id,
-        ch.title AS chapter_title
-      FROM courses c
-      LEFT JOIN course_chapters ch
-        ON c.course_id = ch.course_id
-        AND ch.is_deleted = FALSE
-      WHERE c.is_deleted = FALSE
-      ORDER BY c.title, ch.sort_order;`
+      `SELECT id, title
+       FROM master_courses
+       WHERE is_active = TRUE AND is_deleted = FALSE
+       ORDER BY title;`,
     );
 
-    const coursesMap = {};
-
-    result.rows.forEach((row) => {
-      if (!coursesMap[row.course_id]) {
-        coursesMap[row.course_id] = {
-          course_id: row.course_id,
-          course_title: row.course_title,
-          chapters: [],
-        };
-      }
-
-      if (row.chapter_id) {
-        coursesMap[row.course_id].chapters.push({
-          chapter_id: row.chapter_id,
-          chapter_title: row.chapter_title,
-        });
-      }
-    });
-
     res.json({
-      courses: Object.values(coursesMap),
+      courses: result.rows,
     });
   } catch (error) {
-    console.error("Fetch courses with chapters error:", error);
+    console.error("Fetch courses dropdown error:", error);
     res.status(500).json({
-      message: "Failed to fetch courses and chapters",
+      message: "Failed to fetch courses",
     });
   }
 };
@@ -251,14 +225,14 @@ exports.createLiveClass = async (req, res) => {
         calendarEventId,
         start_time,
         end_time,
-      ]
+      ],
     );
 
     const liveClass = insertResult.rows[0];
 
     const instructorRes = await pool.query(
       `SELECT full_name FROM users WHERE user_id = $1`,
-      [teacher_id]
+      [teacher_id],
     );
 
     res.status(201).json({
@@ -274,6 +248,63 @@ exports.createLiveClass = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to create live class",
+    });
+  }
+};
+
+/* ======================================================
+   Get all live classes for a specific student
+   Only for courses the student is enrolled in
+====================================================== */
+exports.getStudentLiveClasses = async (req, res) => {
+  const userId = req.params.userId; // or req.query.userId depending on your route
+
+  if (!userId) {
+    return res.status(400).json({ message: "Missing userId" });
+  }
+
+  try {
+    const pool = await connectDB();
+
+    const result = await pool.query(
+      `SELECT
+          lc.id AS live_class_id,
+          lc.course_id,
+          lc.chapter_id,
+          lc.teacher_id,
+          lc.title,
+          lc.description,
+          lc.meet_link,
+          lc.start_time,
+          lc.end_time,
+          lc.status,
+          lc.is_active,
+          lc.is_visible_to_students,
+          mc.title AS course_title,
+          u.full_name AS instructor
+       FROM live_classes lc
+       JOIN user_courses uc ON uc.course_id = lc.course_id
+       JOIN master_courses mc ON mc.id = lc.course_id
+       LEFT JOIN users u ON u.user_id = lc.teacher_id
+       WHERE uc.user_id = $1
+         AND uc.payment_status = 'paid'
+         AND uc.is_active = TRUE
+         AND mc.is_deleted = FALSE
+         AND lc.is_active = TRUE
+         AND lc.is_visible_to_students = TRUE
+       ORDER BY lc.start_time DESC;`,
+      [userId],
+    );
+
+    res.json({
+      success: true,
+      liveClasses: result.rows,
+    });
+  } catch (error) {
+    console.error("Fetch student live classes error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch live classes for student",
     });
   }
 };
