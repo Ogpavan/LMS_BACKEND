@@ -25,7 +25,7 @@ router.get("/callback", async (req, res) => {
     const { tokens } = await oauth2Client.getToken(code);
     req.session.googleTokens = tokens;
     // Redirect to frontend after successful login
-    res.redirect("http://localhost:5173"); // Change if your frontend URL is different
+    res.redirect("https://app.skillspardha.com/dashboard/CreateClass"); // Change if your frontend URL is different
   } catch (err) {
     res.status(500).send("Failed to authenticate with Google");
   }
