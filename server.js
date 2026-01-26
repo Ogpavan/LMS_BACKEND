@@ -24,6 +24,8 @@ const courseBuyRoutes = require("./routes/courseBuyRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const courseCategoryRoutes = require("./routes/courseCategoryRoutes");
 
+const transporter = require("./config/mail");
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -149,6 +151,17 @@ app.use("/api/display-courses", displayCourseRoutes);
 app.use("/api/course-buy", courseBuyRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/category", courseCategoryRoutes);
+
+app.get("/test-mail", async (req, res) => {
+  await transporter.sendMail({
+    from: `"Test" <${process.env.GMAIL_USER}>`,
+    to: "pawantwp@email.com",
+    subject: "Gmail SMTP works ✅",
+    text: "If you got this, Gmail App Password is working.",
+  });
+
+  res.send("Mail sent");
+});
 
 /* ======================================================
    START SERVER

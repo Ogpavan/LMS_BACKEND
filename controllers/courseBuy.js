@@ -1,9 +1,18 @@
 const db = require("../config/db");
+const bcrypt = require("bcrypt");
+
+const { sendPasswordEmail } = require("../config/mail");
+const crypto = require("crypto");
 
 /**
  * Create a new enrollment
  * Creates a user if not exists, then enrolls in a course
  */
+
+function generatePassword(length = 12) {
+  return crypto.randomBytes(length).toString("base64").slice(0, length);
+}
+
 exports.createEnrollment = async (req, res) => {
   try {
     const {
@@ -104,8 +113,8 @@ exports.markPaid = async (req, res) => {
 
     const pool = await db.connectDB();
 
-    // Update enrollment with payment details
-    const updateQuery = `
+    // 1️⃣ Update enrollment with payment details
+    const updateEnrollmentQuery = `
       UPDATE user_courses
       SET payment_status = 'paid',
           razorpay_payment_id = $1,
@@ -114,21 +123,58 @@ exports.markPaid = async (req, res) => {
           enrollment_status = 'confirmed',
           updated_at = NOW()
       WHERE id = $4
-      RETURNING *
+      RETURNING user_id
     `;
 
-    const { rows } = await pool.query(updateQuery, [
+    const enrollmentResult = await pool.query(updateEnrollmentQuery, [
       razorpay_payment_id,
       razorpay_order_id,
       razorpay_signature,
       enrollmentId,
     ]);
 
-    if (rows.length === 0) {
+    if (enrollmentResult.rows.length === 0) {
       return res.status(404).json({ error: "Enrollment not found" });
     }
 
-    res.json({ success: true, enrollment: rows[0] });
+    const userId = enrollmentResult.rows[0].user_id;
+
+    // 2️⃣ Fetch user info
+    const userResult = await pool.query(
+      "SELECT email, full_name FROM users WHERE user_id = $1",
+      [userId],
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { email, full_name } = userResult.rows[0];
+
+    // 3️⃣ Generate new password and hash it
+    const newPassword = generatePassword();
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // 4️⃣ Update user password AND auto-approve user
+    await pool.query(
+      `
+      UPDATE users
+      SET password_hash = $1,
+          is_approved = TRUE,
+          updated_at = NOW()
+      WHERE user_id = $2
+      `,
+      [hashedPassword, userId],
+    );
+
+    // 5️⃣ Send password email
+    await sendPasswordEmail(email, full_name, newPassword);
+
+    res.json({
+      success: true,
+      message:
+        "Payment confirmed, user auto-approved, password generated and emailed",
+    });
   } catch (err) {
     console.error("Error marking enrollment as paid:", err);
     res.status(500).json({ error: "Server error", details: err.message });

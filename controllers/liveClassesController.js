@@ -308,3 +308,73 @@ exports.getStudentLiveClasses = async (req, res) => {
     });
   }
 };
+
+/* ======================================================
+   Cancel live class (DELETE Google Meet + Calendar event)
+====================================================== */
+exports.cancelLiveClass = async (req, res) => {
+  const classId = req.params.id;
+
+  if (!req.session.googleTokens?.access_token) {
+    return res.status(401).json({ message: "Google auth required" });
+  }
+
+  try {
+    const pool = await connectDB();
+
+    // Fetch calendar_event_id
+    const { rows } = await pool.query(
+      `SELECT calendar_event_id
+       FROM live_classes
+       WHERE id = $1`,
+      [classId],
+    );
+
+    if (!rows.length || !rows[0].calendar_event_id) {
+      return res.status(404).json({
+        success: false,
+        message: "Live class or calendar event not found",
+      });
+    }
+
+    const calendarEventId = rows[0].calendar_event_id;
+
+    // Set Google credentials
+    oauth2Client.setCredentials(req.session.googleTokens);
+
+    const calendar = google.calendar({
+      version: "v3",
+      auth: oauth2Client,
+    });
+
+    // 🔥 DELETE calendar event (kills Meet link)
+    await calendar.events.delete({
+      calendarId: "primary",
+      eventId: calendarEventId,
+    });
+
+    // Update DB status
+    await pool.query(
+      `UPDATE live_classes
+       SET status = 'cancelled',
+           is_active = FALSE,
+           meet_link = NULL,
+           calendar_event_id = NULL,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [classId],
+    );
+
+    res.json({
+      success: true,
+      message: "Live class cancelled and Meet link deactivated",
+    });
+  } catch (error) {
+    console.error("Cancel live class error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to cancel live class",
+    });
+  }
+};
+  
