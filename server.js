@@ -1,15 +1,15 @@
-// Image upload dependencies
-const multer = require("multer");
-const fs = require("fs");
+// ======================= CORE =======================
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
+const multer = require("multer");
+const fs = require("fs");
 const path = require("path");
 
 const { connectDB } = require("./config/db");
 
-// Routes
+// ======================= ROUTES =======================
 const authRoutes = require("./routes/authRoutes");
 const menuRoutes = require("./routes/menuRoutes");
 const courseRoutes = require("./routes/courseRoutes");
@@ -26,44 +26,17 @@ const courseCategoryRoutes = require("./routes/courseCategoryRoutes");
 
 const transporter = require("./config/mail");
 
+// ======================= APP =======================
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 /* ======================================================
-   MULTER (ONLY CHANGE IS HERE)
+   🔥 TRUST PROXY (CRITICAL FOR PRODUCTION)
 ====================================================== */
-
-// Multer storage for image uploads
-const imageStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const dir = path.join(__dirname, "uploads", "images");
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const name = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    cb(null, name);
-  },
-});
-
-// ✅ ONLY enhancement: limits + fileFilter
-const upload = multer({
-  storage: imageStorage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10 MB
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.mimetype)) {
-      return cb(new Error("Only JPG, PNG, WEBP images allowed"), false);
-    }
-    cb(null, true);
-  },
-});
+app.set("trust proxy", 1);
 
 /* ======================================================
-   CORS CONFIGURATION
+   CORS
 ====================================================== */
 const allowedOrigins = [
   "http://localhost:5173",
@@ -76,63 +49,93 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: function (origin, callback) {
+    origin(origin, callback) {
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        return callback(new Error("CORS not allowed for this origin"));
-      }
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("CORS not allowed"));
     },
     credentials: true,
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "DELETE",
-      "OPTIONS",
-      "PATCH",
-      "HEAD",
-      "XHR",
-    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
 
-// Handle preflight requests
 app.options("*", cors());
 
 /* ======================================================
-   EXPRESS MIDDLEWARE
+   BODY PARSER
 ====================================================== */
 app.use(express.json());
 
+/* ======================================================
+   🔐 SESSION (PRODUCTION SAFE)
+====================================================== */
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "your_secret_key",
+    name: "skillspardha.sid",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    proxy: true,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      secure: true, // REQUIRED for HTTPS
+      sameSite: "none", // REQUIRED for Google OAuth
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   }),
 );
 
-// Static uploads folder
+/* ======================================================
+   🧪 SESSION DEBUG (REMOVE AFTER CONFIRMATION)
+====================================================== */
+app.use((req, res, next) => {
+  console.log("──────── SESSION DEBUG ────────");
+  console.log("Session ID:", req.sessionID);
+  console.log("Has Google Tokens:", !!req.session?.googleTokens);
+  console.log("Cookie Header:", req.headers.cookie);
+  console.log("──────────────────────────────");
+  next();
+});
+
+/* ======================================================
+   MULTER (IMAGE UPLOAD)
+====================================================== */
+const imageStorage = multer.diskStorage({
+  destination(req, file, cb) {
+    const dir = path.join(__dirname, "uploads", "images");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename(req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage: imageStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter(req, file, cb) {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error("Only JPG, PNG, WEBP allowed"));
+    }
+    cb(null, true);
+  },
+});
+
+/* ======================================================
+   STATIC FILES
+====================================================== */
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* ======================================================
-   IMAGE UPLOAD ENDPOINT
+   IMAGE UPLOAD API
 ====================================================== */
 app.post("/api/upload", upload.single("image"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
-  }
-
-  const url = `/uploads/images/${req.file.filename}`;
-  res.json({ url });
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  res.json({ url: `/uploads/images/${req.file.filename}` });
 });
 
 /* ======================================================
@@ -152,14 +155,16 @@ app.use("/api/course-buy", courseBuyRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/category", courseCategoryRoutes);
 
+/* ======================================================
+   TEST MAIL
+====================================================== */
 app.get("/test-mail", async (req, res) => {
   await transporter.sendMail({
     from: `"Test" <${process.env.GMAIL_USER}>`,
     to: "pawantwp@email.com",
-    subject: "Gmail SMTP works ✅",
-    text: "If you got this, Gmail App Password is working.",
+    subject: "SMTP Test",
+    text: "Mail working",
   });
-
   res.send("Mail sent");
 });
 
@@ -170,10 +175,10 @@ async function startServer() {
   try {
     await connectDB();
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`🚀 Server running on port ${PORT}`);
     });
   } catch (err) {
-    console.error("Failed to start server:", err.message);
+    console.error("Server failed:", err);
     process.exit(1);
   }
 }
