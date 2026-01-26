@@ -21,7 +21,7 @@ async function sendPasswordEmail(to, fullName, password) {
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #eaeaea;border-radius:10px;background-color:#f9f9f9;">
       <h2 style="color:#1a73e8;text-align:center;">Welcome to SkillSpardha!</h2>
       <p>Hello <strong>${fullName}</strong>,</p>
-      <p>We’re excited to have you on board. Your payment was successfully received ✅</p>
+      <p>We’re excited to have you on board. Your payment was successfully received </p>
       <p>Here are your login credentials:</p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
         <tr>
